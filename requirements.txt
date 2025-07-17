@@ -4,3 +4,4 @@ python-multipart==0.0.6
 moonshine==0.1.7
 pydub==0.25.1
 ffmpeg-python==0.2.0
+pyaudioop==0.0.1
