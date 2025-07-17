@@ -93,15 +93,14 @@ class SpeechAPITester:
             if not audio_data:
                 raise ValueError("No audio recorded")
             
-            # Convert to MP3 for smaller size
+            # Convert to standard WAV format
             audio_array = np.concatenate(audio_data)
             buffer = io.BytesIO()
-            sf.write(buffer, audio_array, self.fs, format='mp3', bitrate='64k')
+            sf.write(buffer, audio_array, self.fs, format='wav', subtype='PCM_16')
             buffer.seek(0)
             
-            # Prepare request with explicit headers
-            files = {'file': ('recording.mp3', buffer, 'audio/mpeg')}
-            headers = {'Accept': 'application/json'}
+            # Prepare request
+            files = {'file': ('recording.wav', buffer, 'audio/wav')}
             
             logger.debug(f"Sending {len(audio_array)/self.fs:.2f}s audio to API")
             
@@ -110,7 +109,6 @@ class SpeechAPITester:
                 response = requests.post(
                     self.api_url,
                     files=files,
-                    headers=headers,
                     timeout=self.timeout
                 )
                 response.raise_for_status()

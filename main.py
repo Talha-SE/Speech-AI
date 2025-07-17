@@ -2,6 +2,8 @@ from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 import moonshine
 import os, uuid, tempfile, logging
+from pydub import AudioSegment
+import io
 
 app = FastAPI()
 
@@ -13,38 +15,35 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.get("/")
+async def health_check():
+    return {"status": "ready"}
+
 @app.post("/transcribe")
 async def transcribe_audio(file: UploadFile = File(...)):
-    """
-    Endpoint to transcribe audio files using Moonshine
-    Returns:
-        dict: Transcription result
-    """
     try:
-        # Validate audio format
-        ext = os.path.splitext(file.filename)[1].lower()
-        supported_formats = ['.wav', '.mp3', '.ogg', '.flac']
-        
-        if ext not in supported_formats:
-            return {"error": f"Unsupported format. Use: {', '.join(supported_formats)}"}
+        # Validate input
+        if not file.filename:
+            return {"error": "No filename provided"}
             
-        # Save the uploaded file temporarily with correct extension
+        # Read audio safely
         contents = await file.read()
-        logging.basicConfig(level=logging.INFO)
-        temp_dir = tempfile.gettempdir()
-        temp_path = os.path.join(temp_dir, f"moon_tmp_{uuid.uuid4()}{ext}")
-        with open(temp_path, "wb") as f:
-            f.write(contents)
+        if len(contents) == 0:
+            return {"error": "Empty audio file"}
+
+        # Process in temporary file
+        with tempfile.NamedTemporaryFile(suffix='.wav') as tmp:
+            # Convert to WAV if needed
+            if file.filename.lower().endswith(('.mp3', '.ogg', '.flac')):
+                audio = AudioSegment.from_file(io.BytesIO(contents))
+                audio.export(tmp.name, format="wav")
+            else:
+                tmp.write(contents)
+            
+            # Transcribe
+            transcription = moonshine.transcribe(tmp.name)
+            
+        return {"transcription": transcription}
         
-        # Transcribe using Moonshine
-        transcription = moonshine.transcribe(temp_path)
-        
-        # Clean up file
-        try:
-            os.remove(temp_path)
-        except OSError:
-            logging.warning("Temp file cleanup failed")
-        
-        return {"status": "success", "transcription": transcription}
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return {"error": f"Processing failed: {str(e)}"}
