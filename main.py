@@ -2,6 +2,8 @@ from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 import moonshine
 import os, uuid, tempfile, logging
+import sys
+sys.modules['pyaudioop'] = None  # Block PyDub's broken import
 from pydub import AudioSegment
 import io
 
