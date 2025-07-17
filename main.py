@@ -1,6 +1,7 @@
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 import moonshine
+import os, uuid, tempfile, logging
 
 app = FastAPI()
 
@@ -20,13 +21,29 @@ async def transcribe_audio(file: UploadFile = File(...)):
         dict: Transcription result
     """
     try:
-        # Save the uploaded file temporarily
+        # Validate audio format
+        ext = os.path.splitext(file.filename)[1].lower()
+        supported_formats = ['.wav', '.mp3', '.ogg', '.flac']
+        
+        if ext not in supported_formats:
+            return {"error": f"Unsupported format. Use: {', '.join(supported_formats)}"}
+            
+        # Save the uploaded file temporarily with correct extension
         contents = await file.read()
-        with open("temp_audio.webm", "wb") as f:
+        logging.basicConfig(level=logging.INFO)
+        temp_dir = tempfile.gettempdir()
+        temp_path = os.path.join(temp_dir, f"moon_tmp_{uuid.uuid4()}{ext}")
+        with open(temp_path, "wb") as f:
             f.write(contents)
         
         # Transcribe using Moonshine
-        transcription = moonshine.transcribe("temp_audio.webm")
+        transcription = moonshine.transcribe(temp_path)
+        
+        # Clean up file
+        try:
+            os.remove(temp_path)
+        except OSError:
+            logging.warning("Temp file cleanup failed")
         
         return {"status": "success", "transcription": transcription}
     except Exception as e:
